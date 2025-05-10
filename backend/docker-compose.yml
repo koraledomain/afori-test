@@ -1,0 +1,51 @@
+version: '3.9'
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: customer-api
+    ports:
+      - '3000:3000'
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=test_user
+      - DB_PASS=test_pass 
+      - DB_NAME=test_db
+      - DB_SYNC=true
+      - JWT_ACCESS_SECRET=vjlDeI7uVKRnpk
+      - JWT_ACCESS_EXPIRATION=12h
+      - LLM_BASE_URL=https://api.studio.nebius.com/v1/
+      - LLM_MODEL=meta-llama/Llama-3.3-70B-Instruct
+      - LLM_API_KEY=
+    depends_on:
+      - db
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - app-network
+
+  db:
+    image: postgres:15-alpine
+    container_name: customer-db
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_pass
+      POSTGRES_DB: test_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+    networks:
+      - app-network
+
+volumes:
+  db_data:
+
+networks:
+  app-network:
+    driver: bridge

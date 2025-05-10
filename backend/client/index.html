@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Streaming Demo</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .input-section {
+      display: flex;
+      gap: 10px;
+    }
+    input, button, textarea {
+      padding: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    input, textarea {
+      flex-grow: 1;
+    }
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .output {
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 15px;
+      background: #f9f9f9;
+      min-height: 100px;
+    }
+    .step {
+      margin-bottom: 10px;
+      padding: 10px;
+      border-radius: 5px;
+      background: #f0f0f0;
+    }
+    .step-title {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    .status {
+      color: #666;
+      font-style: italic;
+      margin-bottom: 10px;
+    }
+    /* Styling for markdown content */
+    .output pre {
+      background-color: #f0f0f0;
+      padding: 8px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    .output code {
+      font-family: Consolas, Monaco, 'Andale Mono', monospace;
+    }
+    .output table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    .output th, .output td {
+      border: 1px solid #ddd;
+      padding: 8px;
+    }
+    .output th {
+      background-color: #f2f2f2;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Agent Streaming Demo</h1>
+    
+    <div class="input-section">
+      <input type="text" id="jwtToken" placeholder="JWT Token" value="" />
+      <button id="connectBtn">Connect</button>
+    </div>
+    
+    <div class="status" id="connectionStatus">Disconnected</div>
+    
+    <div class="input-section">
+      <input type="text" id="questionInput" placeholder="Ask a question..." value="How many customers live in Wonderland?" disabled />
+      <button id="askBtn" disabled>Ask</button>
+    </div>
+    
+    <div id="stepsContainer"></div>
+  </div>
+
+  <script>
+    let socket;
+    const connectionStatus = document.getElementById('connectionStatus');
+    const jwtTokenInput = document.getElementById('jwtToken');
+    const connectBtn = document.getElementById('connectBtn');
+    const questionInput = document.getElementById('questionInput');
+    const askBtn = document.getElementById('askBtn');
+    const stepsContainer = document.getElementById('stepsContainer');
+    
+    // Set up marked options
+    marked.setOptions({
+      breaks: true,
+      gfm: true
+    });
+    
+    // Helper function for rendering markdown
+    function renderMarkdown(content) {
+      return marked.parse(content);
+    }
+    
+    // Connect button click handler
+    connectBtn.addEventListener('click', () => {
+      const jwtToken = jwtTokenInput.value.trim();
+      if (!jwtToken) {
+        alert('Please enter a JWT token by generating one from auth/generate-token');
+        return;
+      }
+      
+      connectionStatus.textContent = 'Connecting...';
+      
+      // Disconnect existing socket if any
+      if (socket) {
+        socket.disconnect();
+      }
+      
+      // Create new socket connection with JWT token as x-api-key
+      socket = io('ws://localhost:3000', {
+        extraHeaders: {
+          'x-api-key': jwtToken
+        }
+      });
+      
+      // Socket event handlers
+      socket.on('connect', () => {
+        connectionStatus.textContent = 'Connected';
+        questionInput.disabled = false;
+        askBtn.disabled = false;
+        connectBtn.textContent = 'Reconnect';
+      });
+      
+      socket.on('disconnect', () => {
+        connectionStatus.textContent = 'Disconnected';
+        questionInput.disabled = true;
+        askBtn.disabled = true;
+      });
+      
+      socket.on('connect_error', (error) => {
+        connectionStatus.textContent = `Connection Error: ${error.message}`;
+        console.error('Connection error:', error);
+      });
+      
+      socket.on('error', (data) => {
+        connectionStatus.textContent = `Error: ${data.message}`;
+        console.error('Socket error:', data);
+      });
+      
+      socket.on('agentProcessing', (data) => {
+        // Clear previous results
+        stepsContainer.innerHTML = '';
+        
+        connectionStatus.textContent = `Processing: ${data.message}`;
+      });
+      
+      // New handler for step start
+      socket.on('agentStepStart', (data) => {
+        // Create or find the step container
+        let stepId = `step-${data.step}`;
+        let stepDiv = document.getElementById(stepId);
+        
+        if (!stepDiv) {
+          stepDiv = document.createElement('div');
+          stepDiv.id = stepId;
+          stepDiv.className = 'step';
+          
+          let stepTitle = document.createElement('div');
+          stepTitle.className = 'step-title';
+          
+          switch (data.step) {
+            case 'analysis':
+              stepTitle.textContent = 'Step 1: Question Analysis';
+              break;
+            case 'sqlQuery':
+              stepTitle.textContent = 'Step 2: SQL Query Generation';
+              break;
+            case 'queryResult':
+              stepTitle.textContent = 'Step 3: Database Query Results';
+              break;
+            case 'answer':
+              stepTitle.textContent = 'Step 4: Answer Generation';
+              break;
+            default:
+              stepTitle.textContent = `Step: ${data.step}`;
+          }
+          
+          let stepContent = document.createElement('div');
+          stepContent.id = `${stepId}-content`;
+          stepContent.className = 'output';
+          // Create a div to store raw markdown content
+          let markdownContent = document.createElement('div');
+          markdownContent.id = `${stepId}-markdown`;
+          markdownContent.style.display = 'none';
+          
+          stepDiv.appendChild(stepTitle);
+          stepDiv.appendChild(stepContent);
+          stepDiv.appendChild(markdownContent);
+          stepsContainer.appendChild(stepDiv);
+        }
+      });
+      
+      // New handler for streaming chunks for each step
+      socket.on('agentStepChunk', (data) => {
+        let stepId = `step-${data.step}`;
+        let stepContentDiv = document.getElementById(`${stepId}-content`);
+        let markdownDiv = document.getElementById(`${stepId}-markdown`);
+        
+        if (!stepContentDiv) {
+          // If the step container doesn't exist yet, create it
+          let stepDiv = document.createElement('div');
+          stepDiv.id = stepId;
+          stepDiv.className = 'step';
+          
+          let stepTitle = document.createElement('div');
+          stepTitle.className = 'step-title';
+          
+          switch (data.step) {
+            case 'analysis':
+              stepTitle.textContent = 'Step 1: Question Analysis';
+              break;
+            case 'sqlQuery':
+              stepTitle.textContent = 'Step 2: SQL Query Generation';
+              break;
+            case 'queryResult':
+              stepTitle.textContent = 'Step 3: Database Query Results';
+              break;
+            case 'answer':
+              stepTitle.textContent = 'Step 4: Answer Generation';
+              break;
+            default:
+              stepTitle.textContent = `Step: ${data.step}`;
+          }
+          
+          stepContentDiv = document.createElement('div');
+          stepContentDiv.id = `${stepId}-content`;
+          stepContentDiv.className = 'output';
+          
+          // Create a div to store raw markdown content
+          markdownDiv = document.createElement('div');
+          markdownDiv.id = `${stepId}-markdown`;
+          markdownDiv.style.display = 'none';
+          
+          stepDiv.appendChild(stepTitle);
+          stepDiv.appendChild(stepContentDiv);
+          stepDiv.appendChild(markdownDiv);
+          stepsContainer.appendChild(stepDiv);
+        }
+        
+        if (markdownDiv && stepContentDiv) {
+          // Append the chunk to the raw markdown content
+          markdownDiv.textContent += data.chunk;
+          // Render the entire markdown content
+          stepContentDiv.innerHTML = renderMarkdown(markdownDiv.textContent);
+        }
+      });
+      
+      socket.on('agentStepComplete', (data) => {
+        let stepId = `step-${data.step}`;
+        let stepDiv = document.getElementById(stepId);
+        let stepContentDiv = document.getElementById(`${stepId}-content`);
+        
+        if (!stepDiv) {
+          // If the step container doesn't exist yet, create it
+          stepDiv = document.createElement('div');
+          stepDiv.id = stepId;
+          stepDiv.className = 'step';
+          
+          let stepTitle = document.createElement('div');
+          stepTitle.className = 'step-title';
+          
+          switch (data.step) {
+            case 'analysis':
+              stepTitle.textContent = 'Step 1: Question Analysis';
+              break;
+            case 'sqlQuery':
+              stepTitle.textContent = 'Step 2: SQL Query Generated';
+              break;
+            case 'queryResult':
+              stepTitle.textContent = 'Step 3: Database Query Results';
+              break;
+            case 'answer':
+              stepTitle.textContent = 'Step 4: Answer Generation';
+              break;
+            default:
+              stepTitle.textContent = `Step: ${data.step}`;
+          }
+          
+          stepContentDiv = document.createElement('div');
+          stepContentDiv.id = `${stepId}-content`;
+          stepContentDiv.className = 'output';
+          
+          stepDiv.appendChild(stepTitle);
+          stepDiv.appendChild(stepContentDiv);
+          stepsContainer.appendChild(stepDiv);
+        }
+        
+        if (stepContentDiv) {
+          // Render the complete data as markdown
+          stepContentDiv.innerHTML = renderMarkdown(data.data);
+        }
+      });
+      
+      // Remove the old answerChunk and answerComplete handlers as they're replaced by the step-based streaming
+      socket.on('agentComplete', (data) => {
+        connectionStatus.textContent = 'Query processing complete';
+      });
+    });
+    
+    // Ask question button click handler
+    askBtn.addEventListener('click', () => {
+      const question = questionInput.value.trim();
+      if (!question) {
+        alert('Please enter a question');
+        return;
+      }
+      
+      // Clear previous results
+      stepsContainer.innerHTML = '';
+      connectionStatus.textContent = 'Processing question...';
+      
+      // Send question to server
+      socket.emit('question', { question });
+    });
+    
+    // Also submit on Enter key in question input
+    questionInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !askBtn.disabled) {
+        askBtn.click();
+      }
+    });
+  </script>
+</body>
+</html> 
