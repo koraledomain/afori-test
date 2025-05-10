@@ -28,6 +28,8 @@ The system consists of three main components:
 
 ## Challenge Requirements
 
+*We are looking to see how you think and reason for all the points, we don't seek 100% completion of all the points for the test. You just need to provide enough in order to see what is your testing style and strategy.*
+
 ### 1. Test Plan
 
 Create a comprehensive test plan that includes:
@@ -44,30 +46,29 @@ Create a comprehensive test plan that includes:
 
 Develop automated tests covering:
 
+#### Agent Testing (Prio 1 - Focus here)
+- Agents can response dynamic information
+- Test the agents in a manner to validate the quality of their response
+- Test if you manage to make the agent reply something that is not it's main usecase
+
 #### Unit Testing
 - Implemet unit testing using jest
 - Include unit testing only for the folder `agent` and `agent/steps`
 
-#### API Testing
+#### API Testing (One test for each point)
 - Authentication flows
 - CRUD operations for customer data
 - Error handling and edge cases
 - API response validation
 - Performance testing (response times, load testing)
 
-#### WebSocket Testing
+#### WebSocket Testing (One test for each point)
 - Connection establishment
 - Authentication
 - Real-time message streaming
 - Event handling
 - Connection error scenarios
 - Message format validation
-
-#### Integration Testing
-- End-to-end workflows using the client
-- Component interaction
-- Data flow validation
-- Error propagation
 
 ### 3. Test Framework Requirements
 
