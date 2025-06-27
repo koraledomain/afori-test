@@ -176,7 +176,7 @@ It's impossible to due the complete coverage in the given time. We expect you to
 
 ## Getting Started
 
-1. Fork the original repository
+1. Clone the original repository
 2. Set up your development environment
 3. Review the system architecture and requirements
 4. Create your test plan
