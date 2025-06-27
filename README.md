@@ -172,13 +172,7 @@ Your submission will be evaluated based on:
 
 ## Timeline
 
-- Repository setup and initial planning: 1 day
-- Test framework implementation: 2-3 days
-- Test case development: 2-3 days
-- Documentation and reporting: 1 day
-- Review and improvements: 1 day
-
-Total estimated time: 7-9 days
+It's impossible to due the complete coverage in the given time. We expect you to prioritize what are the most critical parts and balance the testing areas.
 
 ## Getting Started
 
