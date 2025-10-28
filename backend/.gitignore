@@ -1,0 +1,22 @@
+# Result of build process
+dist/
+*.js.map
+*.d.ts
+*.tsbuildinfo
+
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+
+# Logs
+*.log
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Docker volumes
+db_data/
+

@@ -1,0 +1,97 @@
+name: Integration Tests (On-Demand)
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_unit_tests:
+        description: 'Also run unit tests?'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Create .env file from secrets
+        env:
+          DB_USER: ${{ secrets.DB_USER || vars.DB_USER || 'test_user' }}
+          DB_PASS: ${{ secrets.DB_PASS || vars.DB_PASS || 'test_pass' }}
+          DB_NAME: ${{ secrets.DB_NAME || vars.DB_NAME || 'test_db' }}
+          JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+          JWT_ACCESS_EXPIRATION: ${{ secrets.JWT_ACCESS_EXPIRATION || vars.JWT_ACCESS_EXPIRATION || '12h' }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: |
+          cat > .env << EOF
+          NODE_ENV=test
+          DB_HOST=db
+          DB_PORT=5432
+          DB_USER=${DB_USER}
+          DB_PASS=${DB_PASS}
+          DB_NAME=${DB_NAME}
+          DB_SYNC=false
+          JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+          JWT_ACCESS_EXPIRATION=${JWT_ACCESS_EXPIRATION}
+          LLM_BASE_URL=${LLM_BASE_URL}
+          LLM_MODEL=${LLM_MODEL}
+          LLM_API_KEY=${LLM_API_KEY}
+          RUN_INTEGRATION_TESTS=true
+          DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@db:5432/${DB_NAME}
+          EOF
+
+      - name: Ensure clean node_modules
+        run: |
+          sudo rm -rf node_modules
+          mkdir -p node_modules
+          sudo chown -R "$USER":"$USER" node_modules
+
+      - name: Install deps (npm ci)
+        run: npm ci
+
+      - name: Start services (docker compose up -d)
+        run: |
+          docker compose up -d
+
+      - name: Wait for PostgreSQL to be ready
+        env:
+          DB_USER: ${{ secrets.DB_USER || vars.DB_USER || 'test_user' }}
+        run: |
+          echo "Waiting for Postgres to accept connections..."
+          for i in {1..30}; do
+            if docker exec customer-db pg_isready -U "$DB_USER" >/dev/null 2>&1; then
+              echo "Postgres is ready."; break; fi; sleep 2;
+          done
+
+      - name: Run unit tests (optional)
+        if: ${{ inputs.include_unit_tests }}
+        run: npm test
+
+      - name: Run integration tests
+        run: npm run test:integration
+
+      - name: Compose status (always)
+        if: always()
+        run: |
+          docker compose ps || true
+          docker compose logs db --tail=200 || true
+
+      - name: Tear down (docker compose down)
+        if: always()
+        run: |
+          docker compose down -v
+
+
