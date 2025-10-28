@@ -1,0 +1,30 @@
+{
+  "name": "afori-test",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm run test:unit",
+    "test:unit": "jest --config jest.config.ts",
+    "test:api": "jest --config jest.config.ts --testPathPattern=agent/.*\\.(api|http)\\.test\\.ts",
+    "test:cypress": "cypress run",
+    "test:cypress:open": "cypress open",
+    "ws:check": "ts-node --project tsconfig.json scripts/ws-check.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.14.9",
+    "@types/supertest": "^2.0.16",
+    "cypress": "^15.5.0",
+    "jest": "^29.7.0",
+    "socket.io-client": "^4.7.5",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  }
+}
