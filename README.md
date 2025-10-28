@@ -44,6 +44,35 @@ Run Cypress from the CLI using the scripts above, or import the project in the C
 - `tsconfig.json` contains the base compiler settings for the workspace.
 - `tsconfig.jest.json` inherits from the base config and tunes module resolution for Jest.
 
+## Working with external Docker images
+If your application lives in a different repository but you want to exercise it with the tooling here, you can package it as a Docker image and make it available to this workspace:
+
+1. **Build the image in the source repository**
+   ```bash
+   # inside the other repository
+   docker build -t my-artifactory.example.com/project/app:latest .
+   ```
+2. **Push the image to your registry (e.g., Artifactory)**
+   ```bash
+   docker push my-artifactory.example.com/project/app:latest
+   ```
+3. **Pull and run the image while working in this repo**
+   ```bash
+   docker pull my-artifactory.example.com/project/app:latest
+   docker run --rm -p 3000:3000 --name external-app \
+     -e NODE_ENV=test \
+     my-artifactory.example.com/project/app:latest
+   ```
+   Adjust the exposed ports and environment variables to match your service.
+4. **Point the tests at the running container** by configuring environment variables (for example, `API_BASE_URL=http://localhost:3000`) before running the npm scripts listed above. You can use a `.env` file with [dotenv](https://www.npmjs.com/package/dotenv) or export variables in your shell:
+   ```bash
+   export API_BASE_URL=http://localhost:3000
+   npm run test:api
+   npm run test:cypress
+   ```
+
+This workflow lets you iterate on the other repository independently while validating behaviour here against a consistent Docker image.
+
 ## Next steps
 From here you can:
 1. Flesh out the `agent/` and `agent/steps/` modules.
