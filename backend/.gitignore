@@ -20,3 +20,7 @@ coverage/
 # Docker volumes
 db_data/
 
+# Cypress
+cypress/screenshots/
+cypress/videos/
+
