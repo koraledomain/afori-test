@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["jest", "node"],
+    "skipLibCheck": true,
+    "esModuleInterop": true
+  },
+  "exclude": [
+    "../cypress/**/*",
+    "../node_modules/**/*"
+  ]
+}
+
