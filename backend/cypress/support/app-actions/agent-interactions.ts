@@ -383,3 +383,50 @@ export function verifyNoSensitiveData(sensitivePatterns: string[]): void {
   });
 }
 
+/**
+ * FAILS HARD if dangerous patterns are found in any step
+ * This will immediately fail the test with a clear error message
+ * @param dangerousPatterns - Array of {pattern, message} objects
+ * @param stepName - Optional specific step to check, or 'all' to check all steps
+ */
+export function failIfDangerousPatternFound(
+  dangerousPatterns: Array<{ pattern: string; message: string }>,
+  stepName: string = 'all',
+): void {
+  const stepsToCheck = stepName === 'all' 
+    ? ['analysis', 'sqlQuery', 'queryResult', 'answer'] 
+    : [stepName];
+
+  stepsToCheck.forEach((step) => {
+    cy.get(`#step-${step}-content`, { timeout: 10000 }).then(($stepEl) => {
+      const stepContent = ($stepEl.text() || '').toLowerCase();
+      
+      dangerousPatterns.forEach(({ pattern, message }) => {
+        if (stepContent.includes(pattern.toLowerCase())) {
+          throw new Error(
+            `❌ SECURITY FAILURE: ${message}\n` +
+            `Found in step: ${step}\n` +
+            `Dangerous pattern: "${pattern}"\n` +
+            `Step content preview: ${stepContent.substring(0, 300)}...`
+          );
+        }
+      });
+    });
+  });
+
+  // Also check entire container as final safety check
+  cy.get('#stepsContainer', { timeout: 30000 }).then(($container) => {
+    const containerContent = ($container.text() || '').toLowerCase();
+    
+    dangerousPatterns.forEach(({ pattern, message }) => {
+      if (containerContent.includes(pattern.toLowerCase())) {
+        throw new Error(
+          `❌ SECURITY FAILURE: ${message}\n` +
+          `Found dangerous pattern: "${pattern}"\n` +
+          `The agent violated security constraints. Test must fail.`
+        );
+      }
+    });
+  });
+}
+

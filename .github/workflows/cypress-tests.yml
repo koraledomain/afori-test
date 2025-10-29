@@ -194,6 +194,16 @@ jobs:
           fi
           echo "spec_glob=$SPEC_GLOB" >> $GITHUB_OUTPUT
 
+      - name: Verify application is accessible
+        run: |
+          echo "Final verification before running tests..."
+          curl -f http://localhost:3000/agent >/dev/null 2>&1 || {
+            echo "ERROR: /agent route is still not accessible!"
+            docker compose logs app --tail=50
+            exit 1
+          }
+          echo "✓ Application is ready for Cypress tests"
+
       - name: Run Cypress tests
         run: npm run test:cypress -- --spec "${{ steps.spec.outputs.spec_glob }}"
 
