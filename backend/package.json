@@ -21,7 +21,7 @@
     "test:integration": "dotenv -e .env -v RUN_INTEGRATION_TESTS=true -- jest -c ./test/jest-integration.config.cjs",
     "prepare": "cd .. && husky",
     "test:cypress": "cypress run",
-    "report:cypress:merge": "mochawesome-merge cypress/reports/*.json > cypress/reports/mochawesome.json",
+    "report:cypress:merge": "rm -f cypress/reports/mochawesome.json && mochawesome-merge cypress/reports/*.json > cypress/reports/mochawesome.json",
     "report:cypress:generate": "marge cypress/reports/mochawesome.json -o cypress/reports --inline",
     "report:cypress": "npm run report:cypress:merge && npm run report:cypress:generate",
     "cypress:open": "cypress open"
