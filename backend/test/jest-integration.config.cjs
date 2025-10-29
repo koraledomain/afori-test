@@ -3,7 +3,12 @@ module.exports = {
   rootDir: '../src',
   testRegex: '.*\\.integration\\.spec\\.ts$',
   transform: {
-    '^.+\\.(t|j)s$': 'ts-jest',
+    '^.+\\.(t|j)s$': [
+      'ts-jest',
+      {
+        tsconfig: '<rootDir>/../test/tsconfig.json',
+      },
+    ],
   },
   collectCoverageFrom: ['**/*.(t|j)s'],
   coverageDirectory: '../coverage',
@@ -12,7 +17,7 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/$1',
   },
   testTimeout: 10000,
-  setupFilesAfterEnv: ['<rootDir>/setup-jest.ts'],
+  setupFilesAfterEnv: ['<rootDir>/../src/setup-jest.ts'],
 };
 
 
