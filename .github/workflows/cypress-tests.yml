@@ -95,6 +95,9 @@ jobs:
       - name: Wait for application to be ready
         run: |
           echo "Waiting for application to be ready on http://localhost:3000..."
+          echo "Checking container status..."
+          docker compose ps
+          
           for i in {1..60}; do
             # First check if the app container is running
             if ! docker ps | grep -q customer-api; then
@@ -103,27 +106,56 @@ jobs:
               continue
             fi
             
-            # Check if the /agent route is accessible (this is what Cypress needs)
-            if curl -f -s http://localhost:3000/agent >/dev/null 2>&1; then
-              echo "Application /agent route is ready!"
-              # Verify it's actually returning HTML content
-              if curl -s http://localhost:3000/agent | grep -q "Agent Streaming Demo"; then
-                echo "Application is fully ready with expected content."
-                break
+            # Check container health - see if it's actually running
+            CONTAINER_STATUS=$(docker inspect customer-api --format='{{.State.Status}}' 2>/dev/null || echo "not found")
+            echo "Container status: $CONTAINER_STATUS (attempt $i/60)"
+            
+            # If container exited, show logs and fail
+            if [ "$CONTAINER_STATUS" = "exited" ]; then
+              echo "Container has exited! Showing logs:"
+              docker compose logs app --tail=100
+              echo "Container exit code:"
+              docker inspect customer-api --format='{{.State.ExitCode}}' 2>/dev/null || echo "unknown"
+              exit 1
+            fi
+            
+            # Check if the app is responding on the port
+            if curl -f -s http://localhost:3000 >/dev/null 2>&1; then
+              echo "Root endpoint responded! Checking /agent route..."
+              # Check if the /agent route is accessible (this is what Cypress needs)
+              if curl -f -s http://localhost:3000/agent >/dev/null 2>&1; then
+                echo "Application /agent route is ready!"
+                # Verify it's actually returning HTML content
+                AGENT_CONTENT=$(curl -s http://localhost:3000/agent)
+                if echo "$AGENT_CONTENT" | grep -q "Agent Streaming Demo"; then
+                  echo "✓ Application is fully ready with expected content."
+                  break
+                else
+                  echo "Agent route responded but content verification failed"
+                fi
+              else
+                echo "Root works but /agent route not ready yet..."
               fi
             fi
             
+            # Every 10 attempts, show progress and logs
+            if [ $((i % 10)) -eq 0 ]; then
+              echo "Still waiting... showing recent app logs:"
+              docker compose logs app --tail=20
+            fi
+            
             if [ $i -eq 60 ]; then
-              echo "Application failed to start after 2 minutes"
-              echo "Checking app status:"
-              docker compose ps app
-              echo "App logs:"
-              docker compose logs app --tail=50
+              echo "❌ Application failed to start after 2 minutes"
+              echo "Container status:"
+              docker compose ps
+              echo "App logs (last 100 lines):"
+              docker compose logs app --tail=100
               echo "Testing connectivity:"
               curl -v http://localhost:3000/agent || true
+              echo "Testing root:"
+              curl -v http://localhost:3000 || true
               exit 1
             fi
-            echo "Waiting for application... attempt $i/60"
             sleep 2
           done
 
