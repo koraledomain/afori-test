@@ -43,6 +43,11 @@ const shouldRunIntegrationTests =
 
     beforeAll(async () => {
       console.log("📝 [INTEGRATION SETUP] Setting up real database and LLM");
+      console.log(`📝 [INTEGRATION SETUP] DATABASE_URL: ${process.env.DATABASE_URL ? '***set***' : 'NOT SET'}`);
+
+      if (!process.env.DATABASE_URL) {
+        throw new Error("DATABASE_URL environment variable is required for integration tests");
+      }
 
       // Create real database connection
       const dbOptions: DataSourceOptions = {
@@ -51,11 +56,18 @@ const shouldRunIntegrationTests =
         // Only connect to test database
         synchronize: false,
         logging: false,
+        connectTimeoutMS: 10000, // 10 second timeout
       };
 
-      dataSource = new DataSource(dbOptions);
-      await dataSource.initialize();
-      console.log("📝 [INTEGRATION SETUP] Database connected");
+      try {
+        dataSource = new DataSource(dbOptions);
+        await dataSource.initialize();
+        console.log("📝 [INTEGRATION SETUP] Database connected successfully");
+      } catch (error) {
+        console.error("📝 [INTEGRATION SETUP] Database connection failed:", error.message);
+        console.error(`📝 [INTEGRATION SETUP] DATABASE_URL format: ${process.env.DATABASE_URL?.replace(/:[^:@]+@/, ':****@')}`);
+        throw error;
+      }
 
       // Create LangChain SqlDatabase wrapper
       sqlDb = await SqlDatabase.fromDataSourceParams({

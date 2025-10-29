@@ -47,7 +47,7 @@ jobs:
           LLM_MODEL=${LLM_MODEL}
           LLM_API_KEY=${LLM_API_KEY}
           RUN_INTEGRATION_TESTS=${RUN_INTEGRATION_TESTS}
-          DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@db:5432/${DB_NAME}
+          DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}
           EOF
 
       - name: Ensure clean node_modules
