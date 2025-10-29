@@ -62,6 +62,11 @@ How to test & use the API:
 
 *NOTE: you need to generate the JWT via the docs in swagger with the endpoint`/auth/generate-token`*
 
+#### Cypress end-to-end checks
+
+- `npm run test:cypress` &mdash; runs the Cypress E2E suite headlessly using the TypeScript-enabled configuration in `cypress.config.ts`.
+- `npm run cypress:open` &mdash; launches the interactive Cypress runner for local development and debugging.
+
 ## Docker Image Export
 
 This application can be exported as a Docker image for use in external projects with Cypress testing or other containerized environments.
