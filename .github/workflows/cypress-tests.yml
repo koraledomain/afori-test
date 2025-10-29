@@ -1,0 +1,159 @@
+name: Cypress E2E Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: "Which tests to run (all or a specific suite)"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - prompt-injections
+          - out-of-scope
+          - sql-manipulation
+          - privilege-escalation
+          - schema-hallucination
+          - result-formatting
+          - performance-stability
+          - data-leakage
+          - defensive-followups
+      extraSpec:
+        description: "Optional custom spec glob (overrides suite)"
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  cypress:
+    name: Run Cypress
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Create .env file from secrets
+        env:
+          DB_USER: ${{ secrets.DB_USER || vars.DB_USER || 'test_user' }}
+          DB_PASS: ${{ secrets.DB_PASS || vars.DB_PASS || 'test_pass' }}
+          DB_NAME: ${{ secrets.DB_NAME || vars.DB_NAME || 'test_db' }}
+          JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+          JWT_ACCESS_EXPIRATION: ${{ secrets.JWT_ACCESS_EXPIRATION || vars.JWT_ACCESS_EXPIRATION || '12h' }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: |
+          cat > .env << EOF
+          NODE_ENV=test
+          DB_HOST=db
+          DB_PORT=5432
+          DB_USER=${DB_USER}
+          DB_PASS=${DB_PASS}
+          DB_NAME=${DB_NAME}
+          DB_SYNC=false
+          JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+          JWT_ACCESS_EXPIRATION=${JWT_ACCESS_EXPIRATION}
+          LLM_BASE_URL=${LLM_BASE_URL}
+          LLM_MODEL=${LLM_MODEL}
+          LLM_API_KEY=${LLM_API_KEY}
+          DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}
+          EOF
+
+      - name: Ensure clean node_modules
+        run: |
+          sudo rm -rf node_modules
+          mkdir -p node_modules
+          sudo chown -R "$USER":"$USER" node_modules
+
+      - name: Install deps (npm ci)
+        run: npm ci
+
+      - name: Start services (docker compose up -d)
+        run: |
+          docker compose up -d
+
+      - name: Wait for PostgreSQL to be ready
+        env:
+          DB_USER: ${{ secrets.DB_USER || vars.DB_USER || 'test_user' }}
+        run: |
+          echo "Waiting for Postgres to accept connections..."
+          for i in {1..30}; do
+            if docker exec customer-db pg_isready -U "$DB_USER" >/dev/null 2>&1; then
+              echo "Postgres is ready."; break; fi; sleep 2;
+          done
+
+      - name: Determine spec pattern
+        id: spec
+        run: |
+          # Prioritize custom glob if provided
+          if [[ -n "${{ github.event.inputs.extraSpec }}" ]]; then
+            SPEC_GLOB="${{ github.event.inputs.extraSpec }}"
+          else
+            case "${{ github.event.inputs.suite }}" in
+              all)
+                SPEC_GLOB="cypress/e2e/**/*.cy.ts" ;;
+              prompt-injections)
+                SPEC_GLOB="cypress/e2e/agent-security/prompt-injections.cy.ts" ;;
+              out-of-scope)
+                SPEC_GLOB="cypress/e2e/agent-security/out-of-scope.cy.ts" ;;
+              sql-manipulation)
+                SPEC_GLOB="cypress/e2e/agent-security/sql-manipulation.cy.ts" ;;
+              privilege-escalation)
+                SPEC_GLOB="cypress/e2e/agent-security/privilege-escalation.cy.ts" ;;
+              schema-hallucination)
+                SPEC_GLOB="cypress/e2e/agent-security/schema-hallucination.cy.ts" ;;
+              result-formatting)
+                SPEC_GLOB="cypress/e2e/agent-security/result-formatting.cy.ts" ;;
+              performance-stability)
+                SPEC_GLOB="cypress/e2e/agent-security/performance-stability.cy.ts" ;;
+              data-leakage)
+                SPEC_GLOB="cypress/e2e/agent-security/data-leakage.cy.ts" ;;
+              defensive-followups)
+                SPEC_GLOB="cypress/e2e/agent-security/defensive-followups.cy.ts" ;;
+              *)
+                echo "Unknown suite '${{ github.event.inputs.suite }}', defaulting to all";
+                SPEC_GLOB="cypress/e2e/**/*.cy.ts" ;;
+            esac
+          fi
+          echo "spec_glob=$SPEC_GLOB" >> $GITHUB_OUTPUT
+
+      - name: Run Cypress tests
+        run: npm run test:cypress -- --spec "${{ steps.spec.outputs.spec_glob }}"
+
+      - name: Generate Cypress Mochawesome report
+        if: always()
+        run: |
+          mkdir -p cypress/reports || true
+          npm run report:cypress || true
+
+      - name: Upload Cypress report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-mochawesome-report
+          path: backend/cypress/reports
+          if-no-files-found: ignore
+
+      - name: Compose status (always)
+        if: always()
+        run: |
+          docker compose ps || true
+          docker compose logs db --tail=200 || true
+          docker compose logs app --tail=200 || true
+
+      - name: Tear down (docker compose down)
+        if: always()
+        run: |
+          docker compose down -v
+
+
