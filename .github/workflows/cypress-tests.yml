@@ -204,7 +204,20 @@ jobs:
           }
           echo "✓ Application is ready for Cypress tests"
 
+      - name: Verify connectivity before Cypress
+        run: |
+          echo "Verifying localhost:3000 connectivity with 20-second timeout..."
+          timeout 20 bash -c 'until curl -f -s http://localhost:3000/agent >/dev/null 2>&1; do sleep 1; done' || {
+            echo "❌ ERROR: Cannot connect to localhost:3000 within 20 seconds!"
+            echo "This indicates the application is not accessible. Killing workflow..."
+            docker compose ps
+            docker compose logs app --tail=50
+            exit 1
+          }
+          echo "✓ Connected to localhost:3000 successfully - ready for Cypress tests"
+
       - name: Run Cypress tests
+        timeout-minutes: 5
         run: npm run test:cypress -- --spec "${{ steps.spec.outputs.spec_glob }}"
 
       - name: Generate Cypress Mochawesome report
