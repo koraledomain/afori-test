@@ -3,7 +3,8 @@
   "compilerOptions": {
     "noEmit": true,
     "types": ["cypress"],
-    "isolatedModules": false
+    "isolatedModules": false,
+    "sourceMap": true
   },
   "include": [
     "cypress/**/*.ts",

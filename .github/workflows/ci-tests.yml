@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   pull_request:
     branches: ["**"]
+    paths:
+      - 'backend/src/agent/steps/**'
 
 jobs:
   tests:
