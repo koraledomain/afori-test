@@ -39,4 +39,5 @@ backend/db_data/
 # Cypress
 backend/cypress/screenshots/
 backend/cypress/videos/
+backend/cypress/reports/
 
