@@ -12,6 +12,7 @@ export const getDatabaseConfig = (
     username: configService.get<string>('DB_USER', 'postgres'),
     password: configService.get<string>('DB_PASS', 'password'),
     database: configService.get<string>('DB_NAME', 'my_database'),
+    schema: 'public',
     entities: Object.values(entities),
     synchronize: configService.get<boolean>('DB_SYNC', true),
     ssl: false,

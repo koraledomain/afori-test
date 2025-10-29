@@ -43,9 +43,13 @@ Ensure you have the following installed on your development machine:
 To setup the project follow these steps:
 
 - Clone the repository
-- Include `LLM_API_KEY` in the `docker-compose.yml`
-- run `docker compose up -d`
-- verify that the database is running with the tables and sample data from `init_db.sql`
+- Create a `.env` file in the `backend/` directory with required environment variables (see `.env.example` for template)
+  - **Required**: `LLM_API_KEY`, `JWT_ACCESS_SECRET`, `DB_USER`, `DB_PASS`, `DB_NAME`
+  - See `.env.example` for all required variables
+- Run `docker compose up -d` (this will fail if `.env` is missing)
+- Verify that the database is running with the tables and sample data from `init_db.sql`
+
+**Important**: No secrets are hardcoded. You must provide all environment variables via `.env` file. The `.env` file should never be committed to the repository.
 
 
 
@@ -57,6 +61,149 @@ How to test & use the API:
 - A Simple custom client for socket.io under `server-url/client`. before using this go to the Swagger docs, generate an auth token then paste the response in the client.
 
 *NOTE: you need to generate the JWT via the docs in swagger with the endpoint`/auth/generate-token`*
+
+## Docker Image Export
+
+This application can be exported as a Docker image for use in external projects with Cypress testing or other containerized environments.
+
+### Quick Start
+
+#### 1. Export Docker Image
+
+Build and export the production Docker image:
+
+```bash
+cd backend
+chmod +x export-image.sh
+./export-image.sh
+```
+
+This will create a file `afori-test-api-image.tar` containing the Docker image.
+
+#### 2. Import Docker Image in External Project
+
+Copy the tar file to your target system, then:
+
+```bash
+chmod +x import-image.sh
+./import-image.sh
+```
+
+Or manually load the image:
+
+```bash
+docker load -i afori-test-api-image.tar
+```
+
+#### 3. Run with Docker Compose
+
+In your external project directory:
+
+```bash
+# Copy necessary files to your project
+cp docker-compose.external.yml /path/to/your/project/
+cp init_db.sql /path/to/your/project/
+
+# Start the services (all variables are pre-configured)
+docker-compose -f docker-compose.external.yml up
+```
+
+**Note**: 
+- The `init_db.sql` file is required for database initialization. It should be in the same directory as `docker-compose.external.yml`.
+- All environment variables are already configured in the file (LLM API key is hardcoded for testing purposes).
+- The API will be available at `http://localhost:3000`
+
+### Configuration
+
+The `docker-compose.external.yml` file includes:
+- **App service**: Pre-built Docker image running in production mode
+- **Database service**: PostgreSQL with initialization scripts
+- **Network**: Bridge network for service communication
+
+All environment variables are pre-configured with test values. No additional setup needed!
+
+### Using Environment Variables for CI/CD
+
+For production or CI/CD environments, you can override environment variables using a `.env` file or environment variables:
+
+**Option 1: Using a .env file**
+
+Create a `.env` file in the same directory as `docker-compose.external.yml`:
+
+```env
+LLM_API_KEY=your_real_api_key_here
+LLM_BASE_URL=https://api.studio.nebius.com/v1/
+LLM_MODEL=meta-llama/Llama-3.3-70B-Instruct
+```
+
+**Option 2: Override via environment variables**
+
+```bash
+export LLM_API_KEY=your_real_api_key_here
+docker-compose -f docker-compose.external.yml up
+```
+
+**Option 3: CI/CD with secrets (GitHub Actions example)**
+
+For CI/CD, use the `docker-compose.external.template.yml` file which uses environment variables:
+
+```yaml
+# In your .github/workflows/test.yml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Load Docker image
+        run: docker load -i afori-test-api-image.tar
+      
+      - name: Start services
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+        run: |
+          cd /path/to/your/tests
+          docker-compose -f docker-compose.external.template.yml up -d
+      
+      - name: Run Cypress tests
+        run: npm run test:cypress
+```
+
+**Note**: The `docker-compose.external.yml` file has hardcoded values for simplicity. Use `docker-compose.external.template.yml` for CI/CD where you need to pass secrets.
+
+### Using with Cypress Tests
+
+Once the Docker image is running in your external project:
+
+1. Configure your Cypress tests to point to `http://localhost:3000`
+2. Generate an auth token from `/auth/generate-token` endpoint
+3. Use the token in your API tests
+
+Example Cypress configuration:
+
+```javascript
+// In your Cypress tests
+const API_BASE_URL = 'http://localhost:3000';
+
+it('should test the API', () => {
+  cy.request({
+    method: 'POST',
+    url: `${API_BASE_URL}/auth/generate-token`,
+    body: {}
+  }).then((response) => {
+    const token = response.body.accessToken;
+    // Use token for authenticated requests
+  });
+});
+```
+
+### Production Dockerfile
+
+The `Dockerfile.prod` uses a multi-stage build to:
+- Build TypeScript code in the builder stage
+- Copy only production dependencies and built files to final image
+- Run as non-root user for security
+- Optimize image size
 
 ## Project Structure
 
