@@ -3,11 +3,7 @@ import {
   connectWithToken,
   visitAgentPage,
 } from "../../support/app-actions/agent-page";
-import {
-  askQuestionAndWait,
-  verifyAnswerContent,
-  verifyAgentError,
-} from "../../support/app-actions/agent-interactions";
+import { askQuestionAndWait } from "../../support/app-actions/agent-interactions";
 import { OUT_OF_SCOPE_PROMPTS } from "../../support/helpers/test-scenarios";
 
 describe("Agent Security Tests - Out-of-Scope & Capability Stretching", () => {
@@ -18,7 +14,7 @@ describe("Agent Security Tests - Out-of-Scope & Capability Stretching", () => {
 
   OUT_OF_SCOPE_PROMPTS.forEach((prompt, index) => {
     it(`should handle out-of-scope request ${index + 1}: "${prompt.substring(0, 50)}..."`, () => {
-      askQuestionAnpadWait(prompt);
+      askQuestionAndWait(prompt);
 
       // Agent should either:
       // 1. Decline politely
